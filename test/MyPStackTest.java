@@ -1,7 +1,7 @@
 /* Download hamcrest-all-1.3.jar and add to build path */
 /* Eclipse: add as external jar, making sure it's above Junit in build order */
 
-
+import static org.mockito.Mockito.*;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -12,12 +12,76 @@ import static org.hamcrest.Matchers.*;
 public class MyPStackTest {
 
     MyPStack s;
+    IDataBase db;
     
 	@Before
 	public void setUp() throws Exception {
-		s = new MyPStack(10);
+		db = mock(IDataBase.class);
+		s = new MyPStack(db);
+	}
+	
+	@Test
+	public void canInstantiateWithMockIDataBase() {
+		assertThat(s,is(notNullValue()));
+	}
+	
+	@Test
+	public void initiallyThereIsNoEntryInDB() 
+		throws OverflowException, InvalidOperationException{
+		verify(db, never()).create(anyString(), anyInt());
+	}
+	
+	@Test
+	public void firstPushSavesTopInDBD() 
+		throws OverflowException, InvalidOperationException{
+		s.push(100);
+		verify(db).create(s.getId(), s.peek());
+	}
+	
+	@Test public void pushUpdatesTopInDBInConsecutivePush() 
+			throws OverflowException, InvalidOperationException{
+		s.push(100);
+		s.push(200);
+		verify(db).update(s.getId(), s.peek());
 	}
 
+	@Test public void popUpdatesTopInDB() 
+			throws OverflowException, InvalidOperationException {
+		s.push(100);
+		s.push(200);
+		s.pop();
+		verify(db).update(s.getId(), s.peek());
+	}
+	
+	@Test
+	public void resetReadsRightValueFromDB()
+		throws OverflowException, InvalidOperationException {
+		s.push(100);
+		when(db.read(s.getId())).thenReturn(100);
+		s.reset();
+		assertThat(s.peek(),is(equalTo(100)));
+	}
+	
+	@Test 
+	public void afterResetStackHasOnlyLastTopElement() 
+		throws OverflowException, InvalidOperationException {
+		s.push(100);
+		s.push(200);
+		when(db.read(s.getId())).thenReturn(200);
+		s.reset();
+		assertThat(s.peek(),is(equalTo(200)));
+		assertThat(s.size(),is(equalTo(1)));
+	}
+	
+	@Test
+	public void whenStackBecomesEmptyDBEntryIsDeleted()
+		throws OverflowException, InvalidOperationException {
+		s.push(100);
+		s.pop();
+		verify(db).delete(s.getId());
+		
+	}
+	
 	@Test
 	public void stackIsEmptyOnConstruction() {
 		assertTrue(s.isEmpty());
@@ -71,6 +135,7 @@ public class MyPStackTest {
 		assertThat(s.size(), is(equalTo(size)));
 	}
 	
+	@Test
 	public void poppingAllValuesLeavesAnEmptyStack() 
 			throws OverflowException, InvalidOperationException {
 		int size = 5;
